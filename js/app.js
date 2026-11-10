@@ -780,15 +780,16 @@ function renderSetup(main) {
         <p class="small muted">Tip: add several at once separated by commas — "Ground Floor, Floor 1, Floor 2".</p>
       </div>
       <div class="card"><div class="card-h"><h3>Generate rooms</h3></div>
-        <p class="small muted" style="margin-top:0">Create many rooms with beds in one go. Rename anything later from Rooms & Beds.</p>
+        <p class="small muted" style="margin-top:0">Create several rooms on a floor at once. Set a default, then change the room ID or bed count of any individual room in the table.</p>
         <form id="quickForm">
           <label>Floor <select name="floor" required>${floorOptions(d)}</select></label>
           <div class="field-row">
             <label>How many rooms <input name="count" type="number" min="1" max="60" value="5" required></label>
             <label>First room ID <input name="first" required value="101"></label></div>
           <div class="field-row">
-            <label>Beds per room <input name="per" type="number" min="1" max="26" value="4" required></label>
+            <label>Default beds per room <input name="per" type="number" min="1" max="26" value="4" required></label>
             <label>Bed IDs <select name="style"><option value="num">1, 2, 3…</option><option value="let">A, B, C…</option><option value="pre">101-1, 101-2…</option></select></label></div>
+          <div class="preview" style="max-height:320px"><table><thead><tr><th>Room ID</th><th>Beds in this room</th></tr></thead><tbody id="quickRows"></tbody></table></div>
           <p class="small muted" id="quickPrev"></p>
           <button class="btn primary" ${d.floors.length ? '' : 'disabled'}>Generate rooms</button>
         </form>
@@ -823,23 +824,51 @@ function renderSetup(main) {
       if (confirm(`Delete floor "${f.name}"?`)) { d.floors = d.floors.filter((x) => x.id !== f.id); saveD(`Delete floor ${f.name}`); }
     }));
     const qf = document.getElementById('quickForm');
-    const plan = () => {
-      const f = new FormData(qf), count = Math.max(0, Number(f.get('count'))), per = Math.max(0, Number(f.get('per'))), first = f.get('first').trim(), style = f.get('style');
+    // Per-room overrides typed into the table, kept by row index.
+    const nameEdits = {}, bedEdits = {};
+    const base = () => {
+      const f = new FormData(qf), count = Math.min(60, Math.max(0, Number(f.get('count')) || 0)), per = Math.min(26, Math.max(1, Number(f.get('per')) || 1)), first = f.get('first').trim();
       const m = first.match(/^(.*?)(\d+)$/);
-      const names = Array.from({ length: count }, (_, i) => (m ? m[1] + String(Number(m[2]) + i).padStart(m[2].length, '0') : `${first}${i + 1}`));
-      const label = (name, j) => (style === 'let' ? String.fromCharCode(65 + j) : style === 'pre' ? `${name}-${j + 1}` : String(j + 1));
-      return { names, per, label, floor: f.get('floor') };
+      return Array.from({ length: count }, (_, i) => ({
+        name: nameEdits[i] ?? (m ? m[1] + String(Number(m[2]) + i).padStart(m[2].length, '0') : `${first}${i + 1}`),
+        beds: bedEdits[i] ?? per,
+      }));
     };
-    const showPlan = () => { const p = plan(); document.getElementById('quickPrev').textContent = p.names.length ? `Creates rooms ${p.names[0]}${p.names.length > 1 ? ' – ' + p.names[p.names.length - 1] : ''} with ${p.per} beds each (${p.names.length * p.per} beds).` : ''; };
-    qf.oninput = showPlan; showPlan();
+    const exists = (name) => d.rooms.some((r) => r.name.toLowerCase() === name.trim().toLowerCase());
+    const summary = () => {
+      const rows = base(), fresh = rows.filter((r) => !exists(r.name)), beds = fresh.reduce((s, r) => s + (Number(r.beds) || 0), 0), dup = rows.length - fresh.length;
+      document.getElementById('quickPrev').textContent = rows.length ? `Will create ${fresh.length} rooms with ${beds} beds in total.${dup ? ` ${dup} already exist and will be skipped.` : ''}` : '';
+    };
+    const drawRows = () => {
+      document.getElementById('quickRows').innerHTML = base().map((r, i) => `<tr>
+        <td><input name="rn_${i}" value="${esc(r.name)}" required style="min-width:90px"></td>
+        <td><input name="rb_${i}" type="number" min="1" max="26" value="${esc(r.beds)}" required style="max-width:110px">${exists(r.name) ? ' <span class="badge bad">exists</span>' : ''}</td></tr>`).join('');
+      summary();
+    };
+    qf.oninput = (e) => {
+      const n = e.target.name || '';
+      if (n.startsWith('rn_')) { nameEdits[n.slice(3)] = e.target.value; return summary(); }
+      if (n.startsWith('rb_')) { bedEdits[n.slice(3)] = e.target.value; return summary(); }
+      if (n === 'first') Object.keys(nameEdits).forEach((k) => delete nameEdits[k]);
+      if (n === 'per') Object.keys(bedEdits).forEach((k) => delete bedEdits[k]);
+      drawRows();
+    };
+    drawRows();
     qf.onsubmit = (e) => {
       e.preventDefault();
-      const p = plan(); let added = 0, skipped = 0;
-      p.names.forEach((name) => {
-        if (d.rooms.some((r) => r.name.toLowerCase() === name.toLowerCase())) { skipped++; return; }
-        d.rooms.push({ id: uid(), floorId: p.floor, name, beds: Array.from({ length: p.per }, (_, j) => ({ id: uid(), label: p.label(name, j), occupant: null })) });
+      const f = new FormData(qf), style = f.get('style'), floor = f.get('floor');
+      const label = (name, j) => (style === 'let' ? String.fromCharCode(65 + j) : style === 'pre' ? `${name}-${j + 1}` : String(j + 1));
+      const rows = base().map((r) => ({ name: String(r.name).trim(), beds: Number(r.beds) }));
+      if (rows.some((r) => !r.name)) return toast('Every room needs an ID', true);
+      if (rows.some((r) => !(r.beds >= 1 && r.beds <= 26))) return toast('Each room needs between 1 and 26 beds', true);
+      if (dupe(rows.map((r) => r.name))) return toast(`Room ID ${dupe(rows.map((r) => r.name))} is used twice`, true);
+      let added = 0, skipped = 0;
+      rows.forEach(({ name, beds }) => {
+        if (exists(name)) { skipped++; return; }
+        d.rooms.push({ id: uid(), floorId: floor, name, beds: Array.from({ length: beds }, (_, j) => ({ id: uid(), label: label(name, j), occupant: null })) });
         added++;
       });
+      const p = { floor };
       if (!added) return toast(`No rooms added – all ${skipped} already exist`, true);
       saveHostel(id, `Generate ${added} rooms on ${floorName(d, p.floor)}`).then(() => { toast(`Added ${added} rooms${skipped ? `, skipped ${skipped} existing` : ''}`); render(); }).catch(() => {});
     };
