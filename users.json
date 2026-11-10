@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "iterations": 600000,
+  "users": [
+    {
+      "username": "owner1",
+      "role": "owner",
+      "salt": "34jTk623gYyFmnNTSplG2A==",
+      "iv": "YgZVdTdPxPLCiZPZ",
+      "ct": "gLvV2l5FnW+fzoSBc3bqhll/qtlyWVzTGrEZpOHEyj1x07rn0lw3QXc4scsYcbxGN0vAYsyHgziOmVWvDQw01l8gSJ799WY4z/3HxHJQjdtLJurTcrqG8rFbe6zVG73pTIEW9cSaX1ZbmYxygLjioXMlMffnqYJkwSKhCSGoaf157rqOGbdES7WhxTLaVVZ92MJ0ZXNqk0LcAf+9P0F/ewUY7ScomtGXKQ=="
+    },
+    {
+      "username": "owner2",
+      "role": "owner",
+      "salt": "4YD4+foe4x28AnDCqgx38A==",
+      "iv": "emrMbJFYLoBCcRXJ",
+      "ct": "pDwN7AyFXVR8sKXfCoVoYENayi3pdHsHMK4Ba0/VbTAtwDArtRK5B1yp8NNHvM5af5UzpryEC6lOrSmenghW8JlGLe1USNgtECRUXauUHSJC25O1ooPY20rzVf70aXcHSK1iSG6a02GuiVKoGUvgunvw71ziJhsG8LKcWf1sv7prmkXNKXNzwdFCfJkNDkS+1ofoQUuOuXrVu5KGoepIWUvez/2eEuxN/g=="
+    },
+    {
+      "username": "owner3",
+      "role": "owner",
+      "salt": "ED8zMRoPTRF1cEMiH7qcww==",
+      "iv": "YqAzdJOMFbGi1uU8",
+      "ct": "SFJDu6M8zG3oly4sNtEX2jhec48MuMPcE13Lzlg/wS3+vxKDoG/CqSnhF83UvjZ6AS8OmwnZpGZmd7tIP5BL9HgC7vc0GclTJWfHmf4Ij+FCAUCzrV5wxC7Ao3nIrbG1cHezKt/oS0rO12s1xKtQ8OBgHoGMCiHooaRaR94iV9v30wJYWZePGHYQcduFfjk4Zw20DEKXS6FUqWO815xkn5pogZg06TAR5Q=="
+    },
+    {
+      "username": "manager1",
+      "role": "manager",
+      "salt": "2ej4uj5YglKEy4PO3+z0+g==",
+      "iv": "o8PwSDONvhHklO3f",
+      "ct": "JDYhryJV60OUTBe/IMm7NHS/NZshRwy4xSFp9LIe9xXJKD7j5xIz8dR9jqZkBvQS5J4Aj6Qp+1KntxK//dCRwck3sPm3aBZaZKvBIUx+xcx4EP4+bTmjOth0FCFG0+cl+76nMXevR1gqAXIMGDEXWo2xEQP0xJ8mqyv6S0UdfTLb/lTZwBYa1olDH59fFnp/F/FAFtSZNsMlOEcDtVjMbMLzMrNp0eZMmA=="
+    },
+    {
+      "username": "manager2",
+      "role": "manager",
+      "salt": "gaFVaYi5q3Z/UnLnkSrfvg==",
+      "iv": "3qxXtV+dI22l1usu",
+      "ct": "LobF0ESzICRS6CqhC5HpWDumr4a1vdHTInsmB8u56ky1KqOoqfxTBvEYq5ElqqOO+oyuusXMGsCmG5BXY1HgrK/v9Dtn9XhauICyvaF78tdDbwvi3rY5fg4X9JU1fYA9SyuJFOUQTVZ8XaZ+V4GVjSsi3CxILBVnN9BT+D7mCe4SYqBc5draVfdyxEr7PCvxFD9VS3tSg3+7mvlMTiCd28Ao6SP6zujSfA=="
+    }
+  ]
+}
