@@ -92,9 +92,12 @@ function renderLogin(error = '') {
           <label>Password <input name="password" type="password" required autocomplete="current-password"></label>
           <label class="check" style="margin:.9rem 0"><input type="checkbox" name="remember" checked> Keep me signed in on this device</label>
           <button class="btn primary" style="width:100%;justify-content:center;padding:.65rem" id="loginBtn">Sign in</button>
+          <button type="button" class="btn" style="width:100%;justify-content:center;padding:.65rem;margin-top:.6rem" id="demoBtn">View with sample data</button>
+          <p class="small muted" style="margin:.5rem 0 0;text-align:center">See how the app looks when filled in. Nothing is saved.</p>
         </form>
       </div>
     </div>`;
+  document.getElementById('demoBtn').onclick = () => { state.auth = Demo.start(); state.hostel = null; boot(); };
   document.getElementById('loginForm').onsubmit = async (e) => {
     e.preventDefault();
     const f = new FormData(e.target), btn = document.getElementById('loginBtn');
@@ -290,6 +293,7 @@ function render() {
             <button class="btn" id="logout" title="Sign out">${icon('logout')}<span>Sign out</span></button>
           </div>
         </div>
+        ${a.demo ? '<div class="demo-bar">Sample data — nothing here is real and nothing is saved. Try anything. <button class="linkbtn" id="exitDemo">Exit sample</button></div>' : ''}
         <main id="main"></main>
       </div>
     </div>`;
@@ -297,6 +301,7 @@ function render() {
   if (sel) { sel.value = state.hostel; sel.onchange = (e) => { state.hostel = e.target.value; render(); }; }
   document.getElementById('refresh').onclick = async () => { await boot(); toast('Up to date'); };
   document.getElementById('logout').onclick = logout;
+  const ed = document.getElementById('exitDemo'); if (ed) ed.onclick = () => location.reload();
   document.querySelectorAll('.nav button').forEach((b) => (b.onclick = () => { state.tab = b.dataset.tab; render(); window.scrollTo(0, 0); }));
   const main = document.getElementById('main');
   ({ dashboard: renderDashboard, rooms: renderRooms, residents: renderResidents, rent: renderRent, expenses: renderExpenses, data: renderData, setup: renderSetup })[state.tab](main);

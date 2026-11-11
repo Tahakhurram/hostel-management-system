@@ -180,3 +180,4 @@ tr.total td{font-weight:600;border-bottom:0}
 .alert{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;background:var(--bad-bg);color:var(--bad);border:1px solid #f4c7c1;border-radius:var(--radius);padding:.8rem 1.1rem}
 .alert b{color:var(--bad)}
 .count{margin-left:auto;background:var(--bad);color:#fff;border-radius:99px;font-size:.68rem;font-weight:700;min-width:19px;height:19px;display:inline-grid;place-items:center;padding:0 5px}
+.demo-bar{background:#fff4dc;color:#7a4e00;padding:.55rem 2rem;font-size:.85rem;border-bottom:1px solid #f1dfb3}.demo-bar .linkbtn{color:#7a4e00;margin-left:.4rem}
