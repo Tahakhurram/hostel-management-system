@@ -242,6 +242,7 @@ function stats(ids, month) {
   t.lost = t.avg * t.available;
   t.net = t.rent - t.expenses;
   t.collected = ids.reduce((s, id) => s + collectedIn(id, month), 0);
+  t.unpaidCount = ids.reduce((s, id) => s + rentRoll(id, month).filter((r) => r.balance > 0).length, 0);
   t.pending = ids.reduce((s, id) => s + rentRoll(id, month).reduce((a, r) => a + Math.max(0, r.balance), 0), 0);
   return t;
 }
@@ -275,7 +276,7 @@ function render() {
     <div class="shell">
       <aside class="side">
         <div class="logo"><div class="logo-mark">${LOGO}</div><div class="logo-text">${esc(state.hostel === ALL ? 'All hostels' : hostelName(state.hostel))}<span>Hostel management</span></div></div>
-        <nav class="nav">${TABS.map(([k, l]) => `<button data-tab="${k}" class="${state.tab === k ? 'active' : ''}">${icon(k)}${l}</button>`).join('')}</nav>
+        <nav class="nav">${TABS.map(([k, l]) => { const n = k === 'rent' ? selectedIds().reduce((s, id) => s + rentRoll(id, thisMonth()).filter((r) => r.balance > 0).length, 0) : 0; return `<button data-tab="${k}" class="${state.tab === k ? 'active' : ''}">${icon(k)}${l}${n ? `<span class="count" title="${n} not fully paid this month">${n}</span>` : ''}</button>`; }).join('')}</nav>
         <div class="side-foot">
           <div class="user"><div class="avatar">${esc(initials(a.username))}</div><div><b>${esc(a.username)}</b><div class="small muted">${cap(a.role)}${a.canWrite ? '' : ' · view only'}</div></div></div>
         </div>
@@ -328,6 +329,7 @@ function renderDashboard(main) {
   main.innerHTML = `
     <div class="section-h"><div><h2>Overview</h2><p>${monthLabel(state.month, true)}${state.month === thisMonth() ? ' · this month' : ''}</p></div>${monthPicker()}</div>
     <div class="stack">
+      ${state.month === thisMonth() && t.unpaidCount ? `<div class="alert"><div><b>${t.unpaidCount} resident${t.unpaidCount === 1 ? ' has' : 's have'} not fully paid rent</b> · ${money(t.pending)} still to collect for ${monthLabel(state.month, true)}</div><button class="btn sm primary" data-go="rent">See who</button></div>` : ''}
       <div class="kpis">
         <div class="card kpi"><div class="k-label">Occupancy</div><div class="k-value">${t.pct}%</div><div class="k-foot">${t.occupied} of ${t.beds} beds booked</div><div class="meter"><i style="width:${t.pct}%"></i></div></div>
         <div class="card kpi"><div class="k-label">Available beds</div><div class="k-value">${t.available}</div><div class="k-foot">${t.emptyRooms} empty room${t.emptyRooms === 1 ? '' : 's'} · ${t.fullRooms} full</div></div>
@@ -366,6 +368,7 @@ function renderDashboard(main) {
       <p class="small faint">Rent figures are the monthly rent agreed with each resident; past months use move-in / move-out dates. Rent actually received is tracked in Rent Collection.</p>
     </div>`;
   bindMonth();
+  main.querySelectorAll('[data-go]').forEach((b) => (b.onclick = () => { state.tab = b.dataset.go; state.rentFilter = 'owing'; render(); }));
   main.querySelectorAll('[data-bed]').forEach((b) => (b.onclick = () => bedDialog(b.dataset.h, b.dataset.room, b.dataset.bed)));
 
   const bar = { borderColor: surface, borderWidth: { top: 0, left: 0, right: 0, bottom: 0 }, borderRadius: 4, borderSkipped: 'start', maxBarThickness: 26 };
@@ -665,16 +668,27 @@ function renderRent(main) {
   const draw = () => {
     const q = state.search.toLowerCase();
     const list = rows.filter((r) => (filt === 'all' || (filt === 'owing' ? r.balance > 0 : r.balance <= 0)) && (!q || [r.name, r.room, r.bed, r.phone, r.cnic, r.hostel].join(' ').toLowerCase().includes(q)));
-    document.getElementById('rentTable').innerHTML = `<thead><tr>${multi ? '<th>Hostel</th>' : ''}<th>Room · Bed</th><th>Resident</th><th class="num">Rent</th><th class="num">Earlier balance</th><th class="num">Paid this month</th><th class="num">Balance now</th><th>Status</th>${w ? '<th></th>' : ''}</tr></thead><tbody>` +
+    document.getElementById('rentTable').innerHTML = `<thead><tr>${multi ? '<th>Hostel</th>' : ''}<th>Room · Bed</th><th>Resident</th><th class="num">Rent</th><th class="num">Earlier balance</th><th class="num">Paid this month</th><th class="num">Balance now</th><th>Status</th>${w ? '<th class="num">Received now <span class="hint">type & Enter</span></th>' : ''}</tr></thead><tbody>` +
       (list.map((r) => `<tr class="clickable" data-rid="${esc(r.rid)}" data-h="${esc(r.h)}">${multi ? `<td>${esc(r.hostel)}</td>` : ''}<td><b>${esc(r.room)}</b> · ${esc(r.bed)}</td>
         <td><b>${esc(r.name)}</b>${r.current ? '' : ' <span class="badge">moved out</span>'}<div class="small muted">${esc(r.phone || '')}</div></td>
         <td class="num">${money(r.fee)}</td><td class="num">${r.prev ? money(r.prev) : '—'}</td><td class="num">${r.paidNow ? money(r.paidNow) : '—'}</td>
         <td class="num"><b style="${r.balance > 0 ? 'color:var(--bad)' : ''}">${money(r.balance)}</b></td><td><span class="badge ${STATUS[r.status][1]}">${STATUS[r.status][0]}</span></td>
-        ${w ? `<td class="num">${r.balance > 0 ? `<button class="btn sm primary" data-pay="${esc(r.rid)}">Receive</button>` : `<button class="btn sm" data-pay="${esc(r.rid)}">Receive</button>`}</td>` : ''}</tr>`).join('')
+        ${w ? `<td class="num quick"><form class="qpay" data-q="${esc(r.rid)}"><input name="amt" type="number" min="1" step="1" inputmode="numeric" placeholder="${r.balance > 0 ? r.balance : 'Amount'}" aria-label="Amount received from ${esc(r.name)}"><button class="btn sm primary" title="Save (or press Enter)">✓</button></form><button type="button" class="linkbtn" data-pay="${esc(r.rid)}">more…</button></td>` : ''}</tr>`).join('')
        || `<tr><td colspan="9" class="empty">${rows.length ? 'No matches.' : 'Nobody owed rent in this month.'}</td></tr>`) +
       (list.length ? `<tr class="total">${multi ? '<td></td>' : ''}<td colspan="2">Total</td><td class="num">${money(list.reduce((s, r) => s + r.fee, 0))}</td><td class="num">${money(list.reduce((s, r) => s + r.prev, 0))}</td><td class="num">${money(list.reduce((s, r) => s + r.paidNow, 0))}</td><td class="num">${money(list.reduce((s, r) => s + r.balance, 0))}</td><td></td>${w ? '<td></td>' : ''}</tr>` : '') + '</tbody>';
     main.querySelectorAll('[data-pay]').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); payDialog(rows.find((r) => r.rid === b.dataset.pay)); }));
-    main.querySelectorAll('tr[data-rid]').forEach((tr) => (tr.onclick = () => historyDialog(rows.find((r) => r.rid === tr.dataset.rid))));
+    main.querySelectorAll('tr[data-rid]').forEach((tr) => (tr.onclick = (e) => { if (e.target.closest('.quick')) return; historyDialog(rows.find((r) => r.rid === tr.dataset.rid)); }));
+    main.querySelectorAll('.qpay').forEach((f, i, all) => (f.onsubmit = async (e) => {
+      e.preventDefault();
+      const r = rows.find((x) => x.rid === f.dataset.q), amt = Number(f.amt.value || 0);
+      if (!(amt > 0)) { f.amt.focus(); return toast('Type the amount received, then press Enter', true); }
+      const d = state.data[r.h], p = { id: uid(), rid: r.rid, name: r.name, room: r.room, bed: r.bed, month: state.month, date: state.month === thisMonth() ? today() : state.month + '-28', amount: amt, method: 'Cash', note: '', by: state.auth.username };
+      f.querySelectorAll('input,button').forEach((x) => (x.disabled = true));
+      d.payments.push(p);
+      try { await saveHostel(r.h, `Rent received: ${r.name} ${money(amt)} for ${p.month}`); } catch { d.payments = d.payments.filter((x) => x !== p); f.querySelectorAll('input,button').forEach((x) => (x.disabled = false)); return; }
+      const next = all[i + 1] && all[i + 1].dataset.q; state.focusRid = next; render();
+    }));
+    if (state.focusRid) { const nf = main.querySelector(`.qpay[data-q="${CSS.escape(state.focusRid)}"] input`); if (nf) nf.focus(); state.focusRid = null; }
   };
   draw();
   document.getElementById('rentSearch').oninput = (e) => { state.search = e.target.value; draw(); };

@@ -171,3 +171,12 @@ tr.total td{font-weight:600;border-bottom:0}
   .login-wrap{grid-template-columns:1fr}.login-art{display:none}
 }
 @media (max-width:520px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.minis{grid-template-columns:repeat(2,minmax(0,1fr))}.kpi .k-value{font-size:1.3rem}}
+
+/* rent quick entry + alerts */
+.qpay{display:inline-flex;gap:.3rem;align-items:center}.qpay input{width:110px;padding:.3rem .5rem;text-align:right}
+.quick{white-space:nowrap}.quick .linkbtn{display:block;margin:.2rem 0 0 auto;font-size:.72rem}
+.linkbtn{border:0;background:none;color:var(--ink);text-decoration:underline;padding:0;cursor:pointer}
+.hint{font-weight:400;text-transform:none;letter-spacing:0;color:var(--faint)}
+.alert{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;background:var(--bad-bg);color:var(--bad);border:1px solid #f4c7c1;border-radius:var(--radius);padding:.8rem 1.1rem}
+.alert b{color:var(--bad)}
+.count{margin-left:auto;background:var(--bad);color:#fff;border-radius:99px;font-size:.68rem;font-weight:700;min-width:19px;height:19px;display:inline-grid;place-items:center;padding:0 5px}
