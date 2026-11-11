@@ -44,12 +44,14 @@ const ICONS = {
   rooms: '<path d="M3 18v-7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v7M3 14h18M3 18v2M21 18v2M7 9V6a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v3"/>',
   residents: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.8a3.5 3.5 0 0 1 0 6.4M18 14.8c1.7.7 3 2.5 3.5 5.2"/>',
   expenses: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h3"/>',
+  rent: '<rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/>',
   data: '<path d="M12 3v12M7 10l5 5 5-5M4 17v3h16v-3"/>',
   setup: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
   refresh: '<path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
 };
+const LOGO = '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 27V12.5L16 6l10 6.5V27" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><path d="M10.5 27v-6.5h11V27M10.5 23h11" fill="none" stroke="#e2b65c" stroke-width="2.2" stroke-linejoin="round"/><circle cx="16" cy="14.5" r="2" fill="#e2b65c"/></svg>';
 const icon = (n) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n]}</svg>`;
 
 // ---------- auth ----------
@@ -76,7 +78,7 @@ function renderLogin(error = '') {
   $app.innerHTML = `
     <div class="login-wrap">
       <div class="login-art">
-        <div class="logo"><div class="logo-mark" style="background:#fff;color:#111">HK</div><div class="logo-text" style="color:#fff">${DEFAULT_HOSTEL}<span style="color:#9a9a9a">Hostel management</span></div></div>
+        <div class="logo"><div class="logo-mark" style="background:#fff;color:var(--ink)">${LOGO}</div><div class="logo-text" style="color:#fff">${DEFAULT_HOSTEL}<span style="color:#9a9a9a">Hostel management</span></div></div>
         <div><div class="grid-dots">${dots}</div><h1>Every bed, every rupee,<br>in one place.</h1>
         <p>Occupancy, residents, rent and expenses for your hostels — updated by your managers, visible to you from anywhere.</p></div>
         <p class="small" style="color:#6f6f6f">Private system · authorised users only</p>
@@ -118,7 +120,7 @@ function renderLogin(error = '') {
 
 // ---------- data ----------
 function normalise(d) {
-  d.floors = d.floors || []; d.rooms = d.rooms || []; d.expenses = d.expenses || []; d.history = d.history || [];
+  d.floors = d.floors || []; d.rooms = d.rooms || []; d.expenses = d.expenses || []; d.history = d.history || []; d.payments = d.payments || []; d.rentStart = d.rentStart || thisMonth(); // rent is tracked from this month onwards
   const valid = (r) => r.floorId && d.floors.some((f) => f.id === r.floorId);
   if (d.rooms.some((r) => !valid(r))) {
     if (!d.floors.some((f) => f.id === UNASSIGNED)) d.floors.push({ id: UNASSIGNED, name: 'Unassigned' });
@@ -188,6 +190,31 @@ const occupiedIn = (id, month) => {
 };
 const expensesFor = (id, month) => state.data[id].expenses.filter((e) => e.date.startsWith(month)).reduce((s, e) => s + Number(e.amount), 0);
 
+// ---------- rent collection ----------
+// Each stay has a stable id (rid). Older records get a deterministic one from bed + move-in date.
+const ridOf = (bedId, o) => o.rid || `${bedId}:${o.since}`;
+const monthsFrom = (from, to) => { const out = []; let [y, m] = from.split('-').map(Number); while (`${y}-${pad(m)}` <= to && out.length < 600) { out.push(`${y}-${pad(m)}`); m++; if (m > 12) { m = 1; y++; } } return out; };
+// Everyone who owed rent in a month: current residents (moved in by then) and past residents whose stay covered it.
+function rentRoll(id, month) {
+  const d = state.data[id], rows = [];
+  d.floors.forEach((f) => sortedRooms(d, f.id).forEach((r) => r.beds.forEach((b) => {
+    const o = b.occupant; if (!o || !o.since || o.since.slice(0, 7) > month) return;
+    rows.push({ h: id, rid: ridOf(b.id, o), name: o.name, phone: o.phone, cnic: o.cnic, room: r.name, bed: b.label, floor: f.name, roomId: r.id, bedId: b.id, fee: Number(o.fee) || 0, from: o.since, to: null, current: true });
+  })));
+  d.history.forEach((x) => { if (!x.from || x.from.slice(0, 7) > month || (x.to || '').slice(0, 7) < month) return;
+    rows.push({ h: id, rid: x.rid || `${x.bedId || x.room + '-' + x.bed}:${x.from}`, name: x.name, phone: x.phone, cnic: x.cnic, room: x.room, bed: x.bed, floor: '', fee: Number(x.fee) || 0, from: x.from, to: x.to, current: false }); });
+  return rows.map((r) => {
+    const start = r.from.slice(0, 7) > d.rentStart ? r.from.slice(0, 7) : d.rentStart, months = start > month ? [] : monthsFrom(start, month), pays = d.payments.filter((p) => p.rid === r.rid);
+    const dueTotal = months.length * r.fee, paidBefore = pays.filter((p) => p.month < month).reduce((s, p) => s + Number(p.amount), 0);
+    const paidNow = pays.filter((p) => p.month === month).reduce((s, p) => s + Number(p.amount), 0);
+    const prev = Math.max(0, months.length - 1) * r.fee - paidBefore, balance = dueTotal - paidBefore - paidNow;
+    const status = balance <= 0 ? (balance < 0 ? 'advance' : 'paid') : paidNow > 0 ? 'partial' : 'unpaid';
+    return { ...r, prev, paidNow, balance, status, pays };
+  }).sort((a, b) => natural(a.room, b.room) || natural(a.bed, b.bed));
+}
+const collectedIn = (id, month) => state.data[id].payments.filter((p) => p.month === month).reduce((s, p) => s + Number(p.amount), 0);
+const roomType = (n) => ({ 1: 'Single', 2: 'Double', 3: 'Triple', 4: 'Four-seater', 5: 'Five-seater', 6: 'Six-seater' }[n] || `${n}-seater`);
+
 function stats(ids, month) {
   const t = { beds: 0, occupied: 0, rooms: 0, floors: 0, rent: 0, expenses: 0, byCat: {}, groups: [], fullRooms: 0, emptyRooms: 0 };
   ids.forEach((id) => {
@@ -214,6 +241,8 @@ function stats(ids, month) {
   t.avg = t.occupied ? t.rent / t.occupied : 0;
   t.lost = t.avg * t.available;
   t.net = t.rent - t.expenses;
+  t.collected = ids.reduce((s, id) => s + collectedIn(id, month), 0);
+  t.pending = ids.reduce((s, id) => s + rentRoll(id, month).reduce((a, r) => a + Math.max(0, r.balance), 0), 0);
   return t;
 }
 
@@ -229,7 +258,7 @@ function mkChart(id, cfg) {
   Chart.defaults.borderColor = css('--line');
   cfg.options = { responsive: true, maintainAspectRatio: false, ...cfg.options };
   cfg.options.plugins = { legend: { display: false }, ...cfg.options.plugins,
-    tooltip: { backgroundColor: '#111', padding: 10, cornerRadius: 8, titleFont: { weight: '600' }, boxPadding: 4, ...(cfg.options.plugins || {}).tooltip } };
+    tooltip: { backgroundColor: '#2c1026', padding: 10, cornerRadius: 8, titleFont: { weight: '600' }, boxPadding: 4, ...(cfg.options.plugins || {}).tooltip } };
   charts.push(new Chart(el, cfg));
 }
 const tableOf = (heads, rows) => `<table><thead><tr>${heads.map((h, i) => `<th class="${i ? 'num' : ''}">${h}</th>`).join('')}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c, i) => `<td class="${i ? 'num' : ''}">${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
@@ -237,7 +266,7 @@ const dataTable = (heads, rows) => `<details class="tbl"><summary>View as table<
 const legend = (items) => `<div class="legend">${items.map(([c, l]) => `<span><i style="background:${c}"></i>${l}</span>`).join('')}</div>`;
 
 // ---------- shell ----------
-const TABS = [['dashboard', 'Dashboard'], ['rooms', 'Rooms & Beds'], ['residents', 'Residents'], ['expenses', 'Expenses'], ['data', 'Import / Export'], ['setup', 'Setup']];
+const TABS = [['dashboard', 'Dashboard'], ['rooms', 'Rooms & Beds'], ['residents', 'Residents'], ['rent', 'Rent Collection'], ['expenses', 'Expenses'], ['data', 'Import / Export'], ['setup', 'Setup']];
 function render() {
   killCharts();
   const a = state.auth, multi = state.meta.hostels.length > 1;
@@ -245,7 +274,7 @@ function render() {
   $app.innerHTML = `
     <div class="shell">
       <aside class="side">
-        <div class="logo"><div class="logo-mark">HK</div><div class="logo-text">${esc(state.hostel === ALL ? 'All hostels' : hostelName(state.hostel))}<span>Hostel management</span></div></div>
+        <div class="logo"><div class="logo-mark">${LOGO}</div><div class="logo-text">${esc(state.hostel === ALL ? 'All hostels' : hostelName(state.hostel))}<span>Hostel management</span></div></div>
         <nav class="nav">${TABS.map(([k, l]) => `<button data-tab="${k}" class="${state.tab === k ? 'active' : ''}">${icon(k)}${l}</button>`).join('')}</nav>
         <div class="side-foot">
           <div class="user"><div class="avatar">${esc(initials(a.username))}</div><div><b>${esc(a.username)}</b><div class="small muted">${cap(a.role)}${a.canWrite ? '' : ' · view only'}</div></div></div>
@@ -269,7 +298,7 @@ function render() {
   document.getElementById('logout').onclick = logout;
   document.querySelectorAll('.nav button').forEach((b) => (b.onclick = () => { state.tab = b.dataset.tab; render(); window.scrollTo(0, 0); }));
   const main = document.getElementById('main');
-  ({ dashboard: renderDashboard, rooms: renderRooms, residents: renderResidents, expenses: renderExpenses, data: renderData, setup: renderSetup })[state.tab](main);
+  ({ dashboard: renderDashboard, rooms: renderRooms, residents: renderResidents, rent: renderRent, expenses: renderExpenses, data: renderData, setup: renderSetup })[state.tab](main);
 }
 const W = () => state.auth.canWrite;
 const needSingle = (main, what) => (main.innerHTML = `<div class="card empty"><b>Choose a hostel</b>Select a single hostel at the top to ${what}.</div>`);
@@ -294,7 +323,7 @@ function renderDashboard(main) {
   const expDelta = prevExp ? Math.round(((t.expenses - prevExp) / prevExp) * 100) : null;
   const margin = t.rent ? Math.round((t.net / t.rent) * 100) : 0;
   const cats = Object.entries(t.byCat).sort((a, b) => b[1] - a[1]);
-  const ink = css('--ink'), ink2 = css('--ink-2'), empty = css('--empty'), blue = css('--blue'), surface = css('--card');
+  const ink = css('--ink'), ink2 = css('--ink-2'), empty = css('--empty'), blue = css('--accent'), surface = css('--card');
 
   main.innerHTML = `
     <div class="section-h"><div><h2>Overview</h2><p>${monthLabel(state.month, true)}${state.month === thisMonth() ? ' · this month' : ''}</p></div>${monthPicker()}</div>
@@ -307,8 +336,8 @@ function renderDashboard(main) {
       </div>
       <div class="minis">
         <div class="card mini"><div class="k-label">Residents</div><div class="k-value">${t.occupied}</div></div>
-        <div class="card mini"><div class="k-label">Rooms</div><div class="k-value">${t.rooms}</div></div>
-        <div class="card mini"><div class="k-label">Floors</div><div class="k-value">${t.floors}</div></div>
+        <div class="card mini"><div class="k-label">Rent collected</div><div class="k-value">${money(t.collected)}</div></div>
+        <div class="card mini"><div class="k-label">Rent pending</div><div class="k-value" style="${t.pending > 0 ? 'color:var(--bad)' : ''}">${money(t.pending)}</div></div>
         <div class="card mini"><div class="k-label">Expenses</div><div class="k-value">${money(t.expenses)}</div></div>
         <div class="card mini"><div class="k-label">vs last month</div><div class="k-value">${expDelta === null ? '—' : (expDelta > 0 ? '+' : '') + expDelta + '%'}</div></div>
         <div class="card mini"><div class="k-label">Lost to empty beds</div><div class="k-value">${money(t.lost)}</div></div>
@@ -334,7 +363,7 @@ function renderDashboard(main) {
         <div class="card"><div class="card-h"><h3>Recent activity</h3><span class="sub">move-ins & move-outs</span></div>${activityList(ids)}</div>
         <div class="card"><div class="card-h"><h3>Vacant beds</h3><span class="sub">${t.available} available</span></div>${vacantList(ids)}</div>
       </div>
-      <p class="small faint">Rent figures are the monthly rent agreed with each resident; past months use move-in / move-out dates. They are not payments received.</p>
+      <p class="small faint">Rent figures are the monthly rent agreed with each resident; past months use move-in / move-out dates. Rent actually received is tracked in Rent Collection.</p>
     </div>`;
   bindMonth();
   main.querySelectorAll('[data-bed]').forEach((b) => (b.onclick = () => bedDialog(b.dataset.h, b.dataset.room, b.dataset.bed)));
@@ -353,7 +382,7 @@ function renderDashboard(main) {
   mkChart('cBeds', { type: 'doughnut', data: { labels: ['Booked', 'Available'], datasets: [{ data: [t.occupied, t.available], backgroundColor: [ink, empty], borderColor: surface, borderWidth: 3, hoverOffset: 4 }] },
     options: { cutout: '72%', plugins: { tooltip: { callbacks: { label: (c) => ` ${c.label}: ${c.parsed} beds` } } } } });
 
-  mkChart('cOccTrend', { type: 'line', data: { labels: months.map((m) => monthLabel(m)), datasets: [{ label: 'Occupancy', data: occ, borderColor: ink, backgroundColor: 'rgba(17,17,17,.06)', fill: true, borderWidth: 2, pointRadius: 0, pointHoverRadius: 5, tension: 0.3 }] },
+  mkChart('cOccTrend', { type: 'line', data: { labels: months.map((m) => monthLabel(m)), datasets: [{ label: 'Occupancy', data: occ, borderColor: ink, backgroundColor: css('--ink-soft'), fill: true, borderWidth: 2, pointRadius: 0, pointHoverRadius: 5, tension: 0.3 }] },
     options: { interaction: { mode: 'index', intersect: false }, scales: { x: { ...noGrid, ticks: { maxTicksLimit: 6 } }, y: { ...yAxis, min: 0, max: 100, ticks: { callback: (v) => v + '%', maxTicksLimit: 5 } } }, plugins: { tooltip: { callbacks: { label: (c) => ` ${c.parsed.y}% booked` } } } } });
 
   const groups = multi ? t.groups : t.groups[0].floors;
@@ -452,7 +481,7 @@ function renderRooms(main) {
       const beds = rooms.reduce((s, r) => s + r.beds.length, 0), occ = rooms.reduce((s, r) => s + r.beds.filter((b) => b.occupant).length, 0);
       return `<div class="floor-h"><h3>${esc(fl.name)}</h3><span class="small muted">${occ}/${beds} beds booked</span></div>
       <div class="rooms">${rooms.map((r) => `<div class="card room">
-        <div class="room-h"><div><strong>Room ${esc(r.name)}</strong> <span class="small muted">· ${r.beds.filter((b) => b.occupant).length}/${r.beds.length}</span></div>
+        <div class="room-h"><div><strong>Room ${esc(r.name)}</strong> <span class="rtype">${roomType(r.beds.length)}</span> <span class="small muted">· ${r.beds.filter((b) => b.occupant).length}/${r.beds.length} booked</span></div>
           ${w ? `<button class="btn sm" data-editroom="${r.id}">Edit</button>` : ''}</div>
         <div class="beds">${r.beds.map((b) => `
           <button class="bed ${b.occupant ? 'taken' : ''}" data-room="${r.id}" data-bed="${b.id}">
@@ -528,28 +557,33 @@ function bedDialog(hid, roomId, bedId) {
   if (!w) {
     return modal(`<h3>${title}</h3><p class="small muted">${sub}</p>${o ? `<table>
       <tr><td class="muted">Resident</td><td><b>${esc(o.name)}</b></td></tr><tr><td class="muted">Phone</td><td>${esc(o.phone)}</td></tr>
-      <tr><td class="muted">CNIC</td><td>${esc(o.cnic)}</td></tr><tr><td class="muted">Monthly rent</td><td>${money(o.fee)}</td></tr>
+      <tr><td class="muted">CNIC</td><td>${esc(o.cnic)}</td></tr><tr><td class="muted">Monthly rent</td><td>${money(o.fee)}</td></tr><tr><td class="muted">Security deposit</td><td>${money(o.deposit || 0)}</td></tr>
       <tr><td class="muted">Moved in</td><td>${fmtDate(o.since)}</td></tr><tr><td class="muted">Notes</td><td>${esc(o.notes)}</td></tr></table>` : '<p>This bed is available.</p>'}
       <div class="modal-actions"><button class="btn" data-close>Close</button></div>`, async () => {});
   }
-  modal(`<h3>${title}</h3><p class="small muted">${sub} · ${o ? 'Occupied' : 'Available'}</p>
+  const st = o ? rentRoll(hid, thisMonth()).find((x) => x.rid === ridOf(bed.id, o)) : null;
+  modal(`<h3>${title}</h3><p class="small muted">${sub} · ${roomType(room.beds.length)} room · ${o ? 'Occupied' : 'Available'}</p>
+    ${st ? `<div class="note">${st.balance > 0 ? `Owes <b>${money(st.balance)}</b> up to ${monthLabel(thisMonth(), true)}` : st.balance < 0 ? `Paid <b>${money(-st.balance)}</b> in advance` : 'Rent is fully paid up to this month'}. Record payments in Rent Collection.</div>` : ''}
     <label>Resident name <input name="name" required value="${esc(o?.name || '')}"></label>
     <div class="field-row"><label>Phone <input name="phone" type="tel" value="${esc(o?.phone || '')}"></label>
     <label>CNIC <input name="cnic" value="${esc(o?.cnic || '')}" placeholder="optional"></label></div>
     <div class="field-row"><label>Monthly rent (${CURRENCY}) <input name="fee" type="number" min="0" step="1" required value="${esc(o?.fee ?? '')}"></label>
-    <label>Move-in date <input name="since" type="date" required value="${esc(o?.since || today())}"></label></div>
+    <label>Security deposit (${CURRENCY}) <input name="deposit" type="number" min="0" step="1" value="${esc(o?.deposit ?? '')}" placeholder="0"></label></div>
+    <label>Move-in date <input name="since" type="date" required value="${esc(o?.since || today())}"></label>
     <label>Notes <input name="notes" value="${esc(o?.notes || '')}" placeholder="optional"></label>
-    ${o ? '<label>Move-out date (for moving out) <input name="out" type="date" value="' + today() + '"></label>' : ''}
+    ${o ? `<div class="field-row"><label>Move-out date (for moving out) <input name="out" type="date" value="${today()}"></label><label>Deposit returned on move-out (${CURRENCY}) <input name="returned" type="number" min="0" step="1" value="${esc(o.deposit ?? '')}"></label></div>` : ''}
     <div class="modal-actions">${o ? '<button class="btn danger left" value="vacate" formnovalidate>Move out</button>' : ''}
       <button class="btn" data-close>Cancel</button><button class="btn primary" value="save">${o ? 'Save changes' : 'Assign bed'}</button></div>`,
   async (f, close, sub) => {
     if (sub && sub.value === 'vacate') {
       if (!confirm(`Move out ${o.name}?`)) return;
-      d.history.push({ name: o.name, phone: o.phone, cnic: o.cnic, room: room.name, bed: bed.label, fee: o.fee, from: o.since, to: f.get('out') || today() });
+      d.history.push({ rid: ridOf(bed.id, o), bedId: bed.id, name: o.name, phone: o.phone, cnic: o.cnic, room: room.name, bed: bed.label, fee: o.fee, deposit: Number(o.deposit) || 0, depositReturned: Number(f.get('returned')) || 0, from: o.since, to: f.get('out') || today(), notes: o.notes || '' });
       bed.occupant = null;
       await saveHostel(hid, `Move out ${o.name} (room ${room.name}, bed ${bed.label})`);
     } else {
-      bed.occupant = { name: f.get('name').trim(), phone: f.get('phone').trim(), cnic: f.get('cnic').trim(), fee: Number(f.get('fee')), since: f.get('since'), notes: f.get('notes').trim() };
+      const since = f.get('since'), rid = o && o.since === since ? ridOf(bed.id, o) : (o ? ridOf(bed.id, o) : uid());
+      if (o && o.since !== since) d.payments.forEach((p) => { if (p.rid === ridOf(bed.id, o)) p.rid = rid; });
+      bed.occupant = { rid, name: f.get('name').trim(), phone: f.get('phone').trim(), cnic: f.get('cnic').trim(), fee: Number(f.get('fee')), deposit: Number(f.get('deposit')) || 0, since, notes: f.get('notes').trim() };
       await saveHostel(hid, `${o ? 'Update' : 'Assign'} ${bed.occupant.name} (room ${room.name}, bed ${bed.label})`);
     }
     close(); render();
@@ -568,7 +602,7 @@ function renderResidents(main) {
   past.sort((a, b) => (b.to || '').localeCompare(a.to || ''));
   const totalRent = rows.reduce((s, r) => s + (Number(r.fee) || 0), 0);
   main.innerHTML = `
-    <div class="section-h"><div><h2>${state.showPast ? past.length + ' past residents' : rows.length + ' current residents'}</h2><p>${state.showPast ? 'People who have moved out.' : 'Monthly rent roll ' + money(totalRent) + '.'}</p></div>
+    <div class="section-h"><div><h2>${state.showPast ? past.length + ' past residents' : rows.length + ' current residents'}</h2><p>${state.showPast ? 'People who have moved out.' : 'Monthly rent roll ' + money(totalRent) + ' · deposits held ' + money(rows.reduce((s, r) => s + (Number(r.deposit) || 0), 0)) + '.'}</p></div>
       <div class="top-actions"><div class="seg"><button data-p="0" class="${state.showPast ? '' : 'on'}">Current</button><button data-p="1" class="${state.showPast ? 'on' : ''}">Past</button></div>
       <input id="search" placeholder="Search name, phone, room…" value="${esc(state.search)}" style="width:220px">
       ${W() && !multi && !state.showPast ? `<button class="btn primary" id="addRes">${icon('plus')}Add resident</button>` : ''}</div></div>
@@ -579,14 +613,14 @@ function renderResidents(main) {
     const tb = document.getElementById('resTable');
     if (state.showPast) {
       const list = past.filter(match);
-      tb.innerHTML = `<thead><tr>${multi ? '<th>Hostel</th>' : ''}<th>Name</th><th>Phone</th><th>Room</th><th>Bed</th><th class="num">Rent</th><th>Moved in</th><th>Moved out</th></tr></thead><tbody>` +
-        (list.map((r) => `<tr>${multi ? `<td>${esc(r.hostel)}</td>` : ''}<td><b>${esc(r.name)}</b></td><td>${esc(r.phone)}</td><td>${esc(r.room)}</td><td>${esc(r.bed)}</td><td class="num">${money(r.fee)}</td><td>${fmtDate(r.from)}</td><td>${fmtDate(r.to)}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">No past residents.</td></tr>') + '</tbody>';
+      tb.innerHTML = `<thead><tr>${multi ? '<th>Hostel</th>' : ''}<th>Name</th><th>Phone</th><th>Room</th><th>Bed</th><th class="num">Rent</th><th class="num">Deposit returned</th><th>Moved in</th><th>Moved out</th></tr></thead><tbody>` +
+        (list.map((r) => `<tr>${multi ? `<td>${esc(r.hostel)}</td>` : ''}<td><b>${esc(r.name)}</b></td><td>${esc(r.phone)}</td><td>${esc(r.room)}</td><td>${esc(r.bed)}</td><td class="num">${money(r.fee)}</td><td class="num">${r.deposit ? money(r.depositReturned || 0) + ' of ' + money(r.deposit) : '—'}</td><td>${fmtDate(r.from)}</td><td>${fmtDate(r.to)}</td></tr>`).join('') || '<tr><td colspan="9" class="empty">No past residents.</td></tr>') + '</tbody>';
       return;
     }
     const list = rows.filter(match);
-    tb.innerHTML = `<thead><tr>${multi ? '<th>Hostel</th>' : ''}<th>Name</th><th>Phone</th><th>CNIC</th><th>Floor</th><th>Room</th><th>Bed</th><th class="num">Monthly rent</th><th>Moved in</th></tr></thead><tbody>` +
-      (list.map((r, i) => `<tr class="clickable" data-i="${rows.indexOf(r)}">${multi ? `<td>${esc(r.hostel)}</td>` : ''}<td><b>${esc(r.name)}</b></td><td>${esc(r.phone)}</td><td>${esc(r.cnic)}</td><td>${esc(r.floor)}</td><td>${esc(r.room)}</td><td>${esc(r.bed)}</td><td class="num">${money(r.fee)}</td><td>${fmtDate(r.since)}</td></tr>`).join('') ||
-        `<tr><td colspan="9" class="empty">${rows.length ? 'No matches.' : 'No residents yet. Click a bed in Rooms & Beds, or import from Excel.'}</td></tr>`) + '</tbody>';
+    tb.innerHTML = `<thead><tr>${multi ? '<th>Hostel</th>' : ''}<th>Name</th><th>Phone</th><th>CNIC</th><th>Floor</th><th>Room</th><th>Bed</th><th class="num">Monthly rent</th><th class="num">Deposit</th><th>Moved in</th></tr></thead><tbody>` +
+      (list.map((r, i) => `<tr class="clickable" data-i="${rows.indexOf(r)}">${multi ? `<td>${esc(r.hostel)}</td>` : ''}<td><b>${esc(r.name)}</b></td><td>${esc(r.phone)}</td><td>${esc(r.cnic)}</td><td>${esc(r.floor)}</td><td>${esc(r.room)}</td><td>${esc(r.bed)}</td><td class="num">${money(r.fee)}</td><td class="num">${r.deposit ? money(r.deposit) : '—'}</td><td>${fmtDate(r.since)}</td></tr>`).join('') ||
+        `<tr><td colspan="10" class="empty">${rows.length ? 'No matches.' : 'No residents yet. Click a bed in Rooms & Beds, or import from Excel.'}</td></tr>`) + '</tbody>';
     tb.querySelectorAll('[data-i]').forEach((tr) => (tr.onclick = () => { const r = rows[tr.dataset.i]; bedDialog(r.h, r.roomId, r.bedId); }));
   };
   draw();
@@ -602,6 +636,84 @@ function renderResidents(main) {
       <div class="modal-actions"><button class="btn" data-close>Cancel</button><button class="btn primary">Next</button></div>`,
     async (f, close) => { const x = free[Number(f.get('bed'))]; close(); bedDialog(state.hostel, x.r.id, x.b.id); });
   };
+}
+
+// ---------- Rent Collection ----------
+const STATUS = { paid: ['Paid', 'good'], advance: ['Advance', 'good'], partial: ['Partial', 'warn'], unpaid: ['Unpaid', 'bad'] };
+function renderRent(main) {
+  const ids = selectedIds(), multi = ids.length > 1, month = state.month, w = W() && !multi;
+  const rows = ids.flatMap((id) => rentRoll(id, month).map((r) => ({ ...r, hostel: hostelName(id) })));
+  const due = rows.reduce((s, r) => s + r.fee, 0), got = rows.reduce((s, r) => s + r.paidNow, 0), owed = rows.reduce((s, r) => s + Math.max(0, r.balance), 0);
+  const nPaid = rows.filter((r) => r.status === 'paid' || r.status === 'advance').length, filt = state.rentFilter || 'all';
+  main.innerHTML = `
+    <div class="section-h"><div><h2>Rent for ${monthLabel(month, true)}</h2><p>Who has paid, who hasn't, and how much each person owes, including earlier months.</p></div>
+      <div class="top-actions">${monthPicker()}<button class="btn" id="rentXls">${icon('data')}Excel</button></div></div>
+    <div class="stack">
+      <div class="kpis">
+        <div class="card kpi"><div class="k-label">Rent due this month</div><div class="k-value">${money(due)}</div><div class="k-foot">${rows.length} resident${rows.length === 1 ? '' : 's'}</div></div>
+        <div class="card kpi"><div class="k-label">Collected</div><div class="k-value">${money(got)}</div><div class="k-foot">${due ? Math.round((got / due) * 100) : 0}% of this month's rent</div><div class="meter"><i style="width:${due ? Math.min(100, Math.round((got / due) * 100)) : 0}%"></i></div></div>
+        <div class="card kpi"><div class="k-label">Still to collect</div><div class="k-value" style="${owed ? 'color:var(--bad)' : ''}">${money(owed)}</div><div class="k-foot">Includes unpaid earlier months</div></div>
+        <div class="card kpi"><div class="k-label">Paid up</div><div class="k-value">${nPaid} / ${rows.length}</div><div class="k-foot">${rows.length - nPaid} not fully paid</div></div>
+      </div>
+      <div class="card" style="padding-top:.8rem;padding-bottom:.4rem">
+        <div class="card-h"><div class="seg">${[['all', 'All'], ['owing', 'Owing'], ['paid', 'Paid']].map(([k, l]) => `<button data-rf="${k}" class="${filt === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+          <input id="rentSearch" placeholder="Search name, room…" value="${esc(state.search)}" style="width:220px"></div>
+        <div class="tablewrap"><table id="rentTable"></table></div></div>
+      <p class="small faint">Rent is due every month from the move-in month (tracking started ${monthLabel(rows.length ? state.data[rows[0].h].rentStart : thisMonth(), true)}; change this in Setup). "Earlier balance" is what was still unpaid before this month (negative means paid in advance). Payments are matched to the person, so moving rooms does not lose their history.</p>
+    </div>`;
+  bindMonth();
+  const draw = () => {
+    const q = state.search.toLowerCase();
+    const list = rows.filter((r) => (filt === 'all' || (filt === 'owing' ? r.balance > 0 : r.balance <= 0)) && (!q || [r.name, r.room, r.bed, r.phone, r.cnic, r.hostel].join(' ').toLowerCase().includes(q)));
+    document.getElementById('rentTable').innerHTML = `<thead><tr>${multi ? '<th>Hostel</th>' : ''}<th>Room · Bed</th><th>Resident</th><th class="num">Rent</th><th class="num">Earlier balance</th><th class="num">Paid this month</th><th class="num">Balance now</th><th>Status</th>${w ? '<th></th>' : ''}</tr></thead><tbody>` +
+      (list.map((r) => `<tr class="clickable" data-rid="${esc(r.rid)}" data-h="${esc(r.h)}">${multi ? `<td>${esc(r.hostel)}</td>` : ''}<td><b>${esc(r.room)}</b> · ${esc(r.bed)}</td>
+        <td><b>${esc(r.name)}</b>${r.current ? '' : ' <span class="badge">moved out</span>'}<div class="small muted">${esc(r.phone || '')}</div></td>
+        <td class="num">${money(r.fee)}</td><td class="num">${r.prev ? money(r.prev) : '—'}</td><td class="num">${r.paidNow ? money(r.paidNow) : '—'}</td>
+        <td class="num"><b style="${r.balance > 0 ? 'color:var(--bad)' : ''}">${money(r.balance)}</b></td><td><span class="badge ${STATUS[r.status][1]}">${STATUS[r.status][0]}</span></td>
+        ${w ? `<td class="num">${r.balance > 0 ? `<button class="btn sm primary" data-pay="${esc(r.rid)}">Receive</button>` : `<button class="btn sm" data-pay="${esc(r.rid)}">Receive</button>`}</td>` : ''}</tr>`).join('')
+       || `<tr><td colspan="9" class="empty">${rows.length ? 'No matches.' : 'Nobody owed rent in this month.'}</td></tr>`) +
+      (list.length ? `<tr class="total">${multi ? '<td></td>' : ''}<td colspan="2">Total</td><td class="num">${money(list.reduce((s, r) => s + r.fee, 0))}</td><td class="num">${money(list.reduce((s, r) => s + r.prev, 0))}</td><td class="num">${money(list.reduce((s, r) => s + r.paidNow, 0))}</td><td class="num">${money(list.reduce((s, r) => s + r.balance, 0))}</td><td></td>${w ? '<td></td>' : ''}</tr>` : '') + '</tbody>';
+    main.querySelectorAll('[data-pay]').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); payDialog(rows.find((r) => r.rid === b.dataset.pay)); }));
+    main.querySelectorAll('tr[data-rid]').forEach((tr) => (tr.onclick = () => historyDialog(rows.find((r) => r.rid === tr.dataset.rid))));
+  };
+  draw();
+  document.getElementById('rentSearch').oninput = (e) => { state.search = e.target.value; draw(); };
+  main.querySelectorAll('[data-rf]').forEach((b) => (b.onclick = () => { state.rentFilter = b.dataset.rf; render(); }));
+  document.getElementById('rentXls').onclick = () => Excel.load().then(() => Excel.download([{ name: `Rent ${month}`, widths: [20, 10, 6, 22, 14, 16, 12, 14, 14, 14, 10],
+    rows: [['Hostel', 'Room', 'Bed', 'Resident', 'Phone', 'CNIC', 'Rent', 'Earlier balance', 'Paid this month', 'Balance now', 'Status'], ...rows.map((r) => [r.hostel, r.room, r.bed, r.name, r.phone || '', r.cnic || '', r.fee, r.prev, r.paidNow, r.balance, STATUS[r.status][0]])] }], `rent-${month}.xlsx`)).catch((e) => toast(e.message, true));
+}
+function payDialog(r) {
+  const d = state.data[r.h], owe = Math.max(0, r.balance);
+  modal(`<h3>Receive rent · ${esc(r.name)}</h3><p class="small muted">Room ${esc(r.room)} · Bed ${esc(r.bed)} · rent ${money(r.fee)} a month · ${owe ? `owes ${money(owe)}` : 'nothing owed'}</p>
+    <div class="field-row"><label>Amount received (${CURRENCY}) <input name="amount" type="number" min="1" step="1" required value="${owe || r.fee}"></label>
+    <label>Date received <input name="date" type="date" required value="${today()}"></label></div>
+    <div class="field-row"><label>For month <input name="month" type="month" required value="${state.month}"></label>
+    <label>Method <select name="method">${['Cash', 'Bank transfer', 'JazzCash', 'Easypaisa', 'Cheque'].map((m) => `<option>${m}</option>`).join('')}</select></label></div>
+    <label>Note <input name="note" placeholder="optional, e.g. receipt no."></label>
+    <div class="modal-actions"><button class="btn" data-close>Cancel</button><button class="btn primary">Save payment</button></div>`,
+  async (f, close) => {
+    const p = { id: uid(), rid: r.rid, name: r.name, room: r.room, bed: r.bed, month: f.get('month'), date: f.get('date'), amount: Number(f.get('amount')), method: f.get('method'), note: f.get('note').trim(), by: state.auth.username };
+    d.payments.push(p);
+    try { await saveHostel(r.h, `Rent received: ${r.name} ${money(p.amount)} for ${p.month}`); } catch { d.payments = d.payments.filter((x) => x !== p); return; }
+    close(); render();
+  });
+}
+function historyDialog(r) {
+  const d = state.data[r.h], w = W(), endM = (r.to || today()).slice(0, 7) > thisMonth() ? thisMonth() : (r.to || today()).slice(0, 7), startM = r.from.slice(0, 7) > d.rentStart ? r.from.slice(0, 7) : d.rentStart, months = startM > endM ? [] : monthsFrom(startM, endM);
+  const pays = d.payments.filter((p) => p.rid === r.rid).sort((a, b) => b.date.localeCompare(a.date));
+  let run = 0; const ledger = months.map((m) => { const paid = pays.filter((p) => p.month === m).reduce((s, p) => s + Number(p.amount), 0); run += r.fee - paid; return [m, paid, run]; }).reverse();
+  modal(`<h3>${esc(r.name)}</h3><p class="small muted">Room ${esc(r.room)} · Bed ${esc(r.bed)} · since ${fmtDate(r.from)}${r.to ? ' · moved out ' + fmtDate(r.to) : ''}</p>
+    <div class="tablewrap"><table><thead><tr><th>Month</th><th class="num">Rent</th><th class="num">Paid</th><th class="num">Owes after</th></tr></thead><tbody>
+    ${ledger.map(([m, paid, bal]) => `<tr><td>${monthLabel(m, true)}</td><td class="num">${money(r.fee)}</td><td class="num">${paid ? money(paid) : '—'}</td><td class="num" style="${bal > 0 ? 'color:var(--bad)' : ''}">${money(bal)}</td></tr>`).join('')}</tbody></table></div>
+    <h3 style="margin-top:1rem">Payments</h3>
+    <div class="tablewrap"><table><tbody>${pays.map((p) => `<tr><td>${fmtDate(p.date)}<div class="small muted">for ${monthLabel(p.month)} · ${esc(p.method || '')}${p.note ? ' · ' + esc(p.note) : ''}</div></td><td class="num">${money(p.amount)}</td>${w ? `<td class="num"><button type="button" class="btn sm danger" data-delpay="${p.id}">Delete</button></td>` : ''}</tr>`).join('') || '<tr><td class="muted">No payments recorded.</td></tr>'}</tbody></table></div>
+    <div class="modal-actions"><button class="btn" data-close>Close</button></div>`, async () => {});
+  document.querySelectorAll('[data-delpay]').forEach((b) => (b.onclick = async () => {
+    if (!confirm('Delete this payment?')) return;
+    const before = d.payments; d.payments = d.payments.filter((p) => p.id !== b.dataset.delpay);
+    try { await saveHostel(r.h, `Delete rent payment of ${r.name}`); } catch { d.payments = before; return; }
+    document.querySelector('.modal').remove(); render();
+  }));
 }
 
 // ---------- Expenses ----------
@@ -653,7 +765,7 @@ function renderData(main) {
       ${w ? (single ? `
       <div class="grid-half">
         <div class="card"><div class="card-h"><h3>Bulk import rooms & residents</h3></div>
-          <p class="small muted" style="margin-top:0">One row per bed: <b>Floor, Room, Bed</b>, and optionally the resident's name, phone, CNIC, monthly rent and move-in date. Missing floors, rooms and beds are created; leave the name blank for an empty bed.</p>
+          <p class="small muted" style="margin-top:0">One row per bed: <b>Floor, Room, Bed</b>, and optionally the resident's name, phone, CNIC, monthly rent, security deposit and move-in date. Missing floors, rooms and beds are created; leave the name blank for an empty bed.</p>
           <div class="row" style="display:flex;gap:.5rem;flex-wrap:wrap"><button class="btn" data-tpl="residents">Download template</button><label class="btn" style="margin:0;color:var(--text)">Choose file…<input type="file" accept=".xlsx,.xls,.csv" data-imp="residents" hidden></label></div>
           <div id="prev-residents"></div></div>
         <div class="card"><div class="card-h"><h3>Bulk import expenses</h3></div>
@@ -674,20 +786,22 @@ function renderData(main) {
 
 async function exportExcel() {
   await Excel.load();
-  const ids = state.meta.hostels.map((h) => h.id), beds = [['Hostel', 'Floor', 'Room', 'Bed', 'Status', 'Resident Name', 'Phone', 'CNIC', 'Monthly Rent (PKR)', 'Move-in Date', 'Notes']], exps = [['Hostel', 'Date', 'Category', 'Amount (PKR)', 'Note']], past = [['Hostel', 'Name', 'Phone', 'Room', 'Bed', 'Monthly Rent (PKR)', 'Moved in', 'Moved out']];
+  const ids = state.meta.hostels.map((h) => h.id), beds = [['Hostel', 'Floor', 'Room', 'Bed', 'Status', 'Resident Name', 'Phone', 'CNIC', 'Monthly Rent (PKR)', 'Security Deposit (PKR)', 'Move-in Date', 'Notes']], exps = [['Hostel', 'Date', 'Category', 'Amount (PKR)', 'Note']], past = [['Hostel', 'Name', 'Phone', 'Room', 'Bed', 'Monthly Rent (PKR)', 'Deposit (PKR)', 'Deposit returned (PKR)', 'Moved in', 'Moved out']], pays = [['Hostel', 'Date received', 'For month', 'Resident', 'Room', 'Bed', 'Amount (PKR)', 'Method', 'Note', 'Recorded by']];
   const summary = [['Hostel', 'Floors', 'Rooms', 'Beds', 'Booked', 'Available', 'Occupancy %', 'Monthly rent roll (PKR)', `Expenses ${state.month} (PKR)`]];
   ids.forEach((id) => {
     const d = state.data[id], h = hostelName(id), s = stats([id], state.month);
     summary.push([h, s.floors, s.rooms, s.beds, s.occupied, s.available, s.pct, s.rent, s.expenses]);
-    d.floors.forEach((f) => sortedRooms(d, f.id).forEach((r) => r.beds.forEach((b) => { const o = b.occupant || {}; beds.push([h, f.name, r.name, b.label, b.occupant ? 'Booked' : 'Available', o.name || '', o.phone || '', o.cnic || '', b.occupant ? Number(o.fee) || 0 : '', o.since || '', o.notes || '']); })));
+    d.floors.forEach((f) => sortedRooms(d, f.id).forEach((r) => r.beds.forEach((b) => { const o = b.occupant || {}; beds.push([h, f.name, r.name, b.label, b.occupant ? 'Booked' : 'Available', o.name || '', o.phone || '', o.cnic || '', b.occupant ? Number(o.fee) || 0 : '', b.occupant ? Number(o.deposit) || 0 : '', o.since || '', o.notes || '']); })));
     [...d.expenses].sort((a, b) => a.date.localeCompare(b.date)).forEach((e) => exps.push([h, e.date, e.category, Number(e.amount), e.note || '']));
-    d.history.forEach((x) => past.push([h, x.name, x.phone || '', x.room, x.bed, Number(x.fee) || 0, x.from, x.to]));
+    d.history.forEach((x) => past.push([h, x.name, x.phone || '', x.room, x.bed, Number(x.fee) || 0, Number(x.deposit) || 0, Number(x.depositReturned) || 0, x.from, x.to]));
+    [...d.payments].sort((a, b) => a.date.localeCompare(b.date)).forEach((p) => pays.push([h, p.date, p.month, p.name, p.room, p.bed, Number(p.amount), p.method || '', p.note || '', p.by || '']));
   });
   Excel.download([
     { name: 'Summary', rows: summary, widths: [22, 8, 8, 8, 8, 10, 12, 22, 22] },
-    { name: 'Beds & Residents', rows: beds, widths: [20, 14, 8, 6, 10, 22, 14, 16, 18, 14, 24] },
+    { name: 'Beds & Residents', rows: beds, widths: [20, 14, 8, 6, 10, 22, 14, 16, 18, 18, 14, 24] },
+    { name: 'Rent Payments', rows: pays, widths: [20, 12, 10, 22, 8, 6, 14, 14, 24, 12] },
     { name: 'Expenses', rows: exps, widths: [20, 12, 14, 14, 30] },
-    { name: 'Past Residents', rows: past, widths: [20, 22, 14, 8, 6, 18, 12, 12] }], `hostel-data-${today()}.xlsx`);
+    { name: 'Past Residents', rows: past, widths: [20, 22, 14, 8, 6, 18, 14, 20, 12, 12] }], `hostel-data-${today()}.xlsx`);
 }
 
 function showPreview(kind, html, onImport) {
@@ -723,7 +837,7 @@ function previewResidents(rows, fname) {
     if (!name) return;
     if (b.occupant && b.occupant.name.toLowerCase() !== name.toLowerCase()) return errors.push(`Row ${n}: room ${roomName} bed ${bedLabel} is already taken by ${b.occupant.name}`);
     if (b.occupant) c.updated++; else c.residents++;
-    b.occupant = { name, phone: String(P('phone', 'mobile')).trim(), cnic: String(P('cnic')).trim(), fee, since, notes: String(P('note')).trim() };
+    b.occupant = { ...(b.occupant || { rid: uid() }), name, phone: String(P('phone', 'mobile')).trim(), cnic: String(P('cnic')).trim(), fee, deposit: Excel.toNum(P('securitydeposit', 'deposit', 'security')) || (b.occupant && b.occupant.deposit) || 0, since, notes: String(P('note')).trim() };
   });
   const any = c.floors + c.rooms + c.beds + c.residents + c.updated;
   showPreview('residents', `<div class="note" style="margin-top:1rem"><b>${esc(fname)}</b> · ${rows.length} rows<br>
@@ -797,6 +911,7 @@ function renderSetup(main) {
     </div>` : '<div class="card empty"><b>Choose a hostel</b>Select a single hostel at the top to configure its floors and rooms.</div>'}
     <div class="card"><div class="card-h"><h3>Hostels</h3><span class="sub">${state.meta.hostels.length} total</span></div>
       <div class="tablewrap"><table><tbody>${state.meta.hostels.map((h) => { const s = stats([h.id], state.month); return `<tr><td><b>${esc(h.name)}</b><div class="small muted">${s.rooms} rooms · ${s.beds} beds</div></td><td class="num"><button class="btn sm" data-rename="${esc(h.id)}">Rename</button></td></tr>`; }).join('')}</tbody></table></div>
+      ${single ? `<form id="rentStartForm" style="display:flex;gap:.5rem;align-items:end;margin-top:.9rem;flex-wrap:wrap"><label style="margin:0;flex:1;min-width:220px">Track rent payments from (earlier months count as settled) <input name="m" type="month" required value="${esc(d.rentStart)}" max="${thisMonth()}"></label><button class="btn">Save</button></form>` : ''}
       <form id="hostelForm" style="display:flex;gap:.5rem;margin-top:.9rem"><input name="name" required placeholder="Add another hostel (set it up later)"><button class="btn">${icon('plus')}Add hostel</button></form>
     </div></div>`;
 
@@ -823,6 +938,7 @@ function renderSetup(main) {
       if (d.rooms.some((r) => r.floorId === f.id)) return toast('Move or delete the rooms on this floor first', true);
       if (confirm(`Delete floor "${f.name}"?`)) { d.floors = d.floors.filter((x) => x.id !== f.id); saveD(`Delete floor ${f.name}`); }
     }));
+    document.getElementById('rentStartForm').onsubmit = (e) => { e.preventDefault(); d.rentStart = new FormData(e.target).get('m'); saveD(`Track rent from ${d.rentStart}`); };
     const qf = document.getElementById('quickForm');
     // Per-room overrides typed into the table, kept by row index.
     const nameEdits = {}, bedEdits = {};

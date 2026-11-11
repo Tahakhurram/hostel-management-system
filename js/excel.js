@@ -52,17 +52,17 @@ const Excel = (() => {
     XLSX.writeFile(wb, filename);
   }
 
-  const RES_HEAD = ['Floor', 'Room', 'Bed', 'Resident Name', 'Phone', 'CNIC', 'Monthly Rent (PKR)', 'Move-in Date (YYYY-MM-DD)', 'Notes'];
+  const RES_HEAD = ['Floor', 'Room', 'Bed', 'Resident Name', 'Phone', 'CNIC', 'Monthly Rent (PKR)', 'Security Deposit (PKR)', 'Move-in Date (YYYY-MM-DD)', 'Notes'];
   const EXP_HEAD = ['Date (YYYY-MM-DD)', 'Category', 'Amount (PKR)', 'Note'];
 
   return {
     load, readRows, toDate, toNum, pick, download, RES_HEAD, EXP_HEAD,
     async template(kind) {
       await load();
-      if (kind === 'residents') download([{ name: 'Rooms & Residents', widths: [14, 8, 6, 22, 14, 16, 18, 22, 24], rows: [RES_HEAD,
-        ['Ground Floor', '101', '1', 'Ali Khan', '0300-1234567', '35202-1234567-1', 15000, '2026-11-01', ''],
-        ['Ground Floor', '101', '2', '', '', '', '', '', 'empty bed – leave name blank'],
-        ['Floor 1', '201', 'A', 'Usman Ahmed', '0312-7654321', '', 18000, '2026-10-15', '']] }], 'rooms-residents-template.xlsx');
+      if (kind === 'residents') download([{ name: 'Rooms & Residents', widths: [14, 8, 6, 22, 14, 16, 18, 20, 22, 24], rows: [RES_HEAD,
+        ['A Floor', 'A01', '1', 'Ali Khan', '0300-1234567', '35202-1234567-1', 15000, 15000, '2026-11-01', ''],
+        ['A Floor', 'A01', '2', '', '', '', '', '', '', 'empty bed – leave name blank'],
+        ['B Floor', 'B01', '1', 'Usman Ahmed', '0312-7654321', '', 18000, 10000, '2026-10-15', '']] }], 'rooms-residents-template.xlsx');
       else download([{ name: 'Expenses', widths: [18, 14, 14, 30], rows: [EXP_HEAD,
         ['2026-11-05', 'Electricity', 42000, 'LESCO bill'], ['2026-11-07', 'Internet', 6500, 'Fiber']] }], 'expenses-template.xlsx');
     },
