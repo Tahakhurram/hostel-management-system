@@ -3,7 +3,7 @@
 //   hostels/<id>.json   -> { floors, rooms:[{id,floorId,name,beds:[{id,label,occupant}]}], expenses, history }
 // Sign-in: users.json (in this public repo) holds each login's GitHub token, AES-GCM encrypted with its password.
 const CURRENCY = 'PKR';
-const DEFAULT_HOSTEL = 'HOSTEL DE KHAS';
+const DEFAULT_HOSTEL = 'HDK-1';
 const EXPENSE_CATEGORIES = ['Electricity', 'Internet', 'Water', 'Gas', 'Salaries', 'Maintenance', 'Food', 'Rent', 'Cleaning', 'Other'];
 const ALL = '__all__';
 const UNASSIGNED = '__unassigned__';
@@ -78,7 +78,7 @@ function renderLogin(error = '') {
   $app.innerHTML = `
     <div class="login-wrap">
       <div class="login-art">
-        <div class="logo"><div class="logo-mark" style="background:#fff;color:var(--ink)">${LOGO}</div><div class="logo-text" style="color:#fff">${DEFAULT_HOSTEL}<span style="color:#9a9a9a">Hostel management</span></div></div>
+        <div class="logo"><div class="logo-mark" style="background:#fff;color:var(--ink)">${LOGO}</div><div class="logo-text" style="color:#fff">HDK Hostels<span style="color:#9a9a9a">Hostel management</span></div></div>
         <div><div class="grid-dots">${dots}</div><h1>Every bed, every rupee,<br>in one place.</h1>
         <p>Occupancy, residents, rent and expenses for your hostels — updated by your managers, visible to you from anywhere.</p></div>
         <p class="small" style="color:#6f6f6f">Private system · authorised users only</p>
